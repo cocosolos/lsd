@@ -1,0 +1,8 @@
+server/build
+server/documentation
+server/log
+server/losmeshes
+server/navmeshes
+server/scripts
+server/settings
+server/sql
