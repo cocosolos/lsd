@@ -26,6 +26,11 @@ That's it! All the setup is handled for you. Check out the [official LSB documen
 
 ----
 
+## Updating
+
+- `git submodule update --remote --merge`
+    - This will pull the latest changes from upstream LSB. Run `docker compose up --build --detach` again to rebuild and start/restart the containers.
+
 ## Notes
 
 - If using WSL with Windows, make sure [the project is stored in the WSL file system](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems) for best performance.
