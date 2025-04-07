@@ -1,9 +1,9 @@
 #!/bin/bash
 
-ENV_FILE="/env/.env"
+ENV_FILE="/config/.env"
 
-# Set default values if the .env file is empty.
-if [ ! -s "$ENV_FILE" ]; then
+# Set default values if the .env file doesn't exist.
+if [ ! -e "$ENV_FILE" ]; then
     MARIADB_DATABASE=xidb
     MARIADB_USER=xiadmin
     XI_NETWORK_ENABLE_HTTP=1

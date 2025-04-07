@@ -34,8 +34,8 @@ That's it! All the setup is handled for you. Check out the [official LSB documen
 ## Notes
 
 - If using WSL with Windows, make sure [the project is stored in the WSL file system](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems) for best performance.
-- To facilitate automatically generating secure database passwords and simplify the setup process, the `.env` file is intentionally empty and untracked by Git.
-  - **Optional** - You can manually populate this _before_ building the containers with these variables:
+- Secure database passwords and a default user and database name are generated into `config/.env` to simplify the setup process.
+  - **Optional** - You can manually create this _before_ building the containers with these variables:
     ```
     MARIADB_DATABASE=
     MARIADB_USER=
