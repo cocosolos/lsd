@@ -1,20 +1,18 @@
 x-common: &common # Configs used by more than one service.
-  image: lsd_service
+  image: lsd_service:ubuntu
   pull_policy: never
-  entrypoint: ["/entrypoint.sh"] # Copies the MariaDB env vars into corresponding LSB settings.
   environment:
     XI_NETWORK_HTTP_HOST: 0.0.0.0
     XI_NETWORK_ZMQ_IP: world
     XI_NETWORK_SQL_HOST: database
-  volumes: # YAML merge can't be used with sequences, so bind everything here. (SEE NOTE ABOUT WSL IN README!)
+  volumes:
+    - ./.git:/.git
     - ./config:/config
-    - ./.git:/.git               # Since LSB is a submodule, we want to preserve
-    - ./server/.git:/server/.git # the directory structure inside the container.
+    - ./server/.git:/server/.git
     - ./server/log:/server/log
     - ./server/losmeshes:/server/losmeshes
     - ./server/modules:/server/modules
     - ./server/navmeshes:/server/navmeshes
-    - ./server/res:/server/res
     - ./server/scripts:/server/scripts
     - ./server/settings:/server/settings
     - ./server/sql:/server/sql
@@ -24,22 +22,24 @@ services:
   database:
     image: mariadb
     entrypoint: ["/mariadb-entrypoint.sh"]
+    command: ["mariadbd"]
     restart: always
     volumes:
       - ./config:/config
       - ./mariadb-entrypoint.sh:/mariadb-entrypoint.sh # Custom entrypoint to generate .env.
-      - ./server/sql:/docker-entrypoint-initdb.d # Initializes the database.
       - database:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 3m # First time initialization takes a while, so give it extra time.
-      interval: 15s    # TODO: use dbtool setup, set lower healthcheck.
+      start_period: 10s
+      interval: 10s
       timeout: 5s
-      retries: 4
+      retries: 3
 
   dbtool:
     <<: *common # Import common configs.
-    build: . # This service builds the image shared by all LSB services.
+    build:
+      context: .
+      dockerfile: docker/ubuntu.Dockerfile # This service builds the image shared by all LSB services.
     command: ["python3", "/server/tools/dbtool.py", "update"]
     restart: no
     depends_on:

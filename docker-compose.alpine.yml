@@ -1,0 +1,18 @@
+services:
+  dbtool:
+    image: lsd_service:alpine
+    build:
+      context: .
+      dockerfile: docker/alpine.Dockerfile
+
+  connect:
+    image: lsd_service:alpine
+
+  search:
+    image: lsd_service:alpine
+
+  world:
+    image: lsd_service:alpine
+
+  map:
+    image: lsd_service:alpine
