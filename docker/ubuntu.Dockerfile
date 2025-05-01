@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libzmq5 \
     mariadb-client \
     python3 \
+    tzdata \
     zlib1g
 
 RUN git config --system --add safe.directory /server
@@ -41,20 +42,18 @@ ENV PATH=/xiadmin/.local/bin:$PATH
 FROM base AS build
 
 # Install build dependencies.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install --assume-yes --no-install-recommends --quiet \
+RUN apt-get update && apt-get install --assume-yes --no-install-recommends --quiet \
     binutils-dev \
     build-essential \
     ccache \
     cmake \
     g++ \
-    git \
     libluajit-5.1-dev \
     libmariadb-dev-compat \
     libssl-dev \
     libzmq3-dev \
     make \
+    ninja-build \
     python3-dev \
     python3-pip \
     zlib1g-dev
@@ -85,11 +84,11 @@ RUN --mount=type=cache,target=/xiadmin/build,uid=$UID,gid=$GID \
     cp -p /xiadmin/build/version.cpp /server/src/common/ 2> /dev/null; \
     cp -p /xiadmin/build/xi_* /server/ 2> /dev/null; \
     # --- End ---
-    cmake -S /server -B /xiadmin/build -DCMAKE_BUILD_TYPE=Release && \
+    cmake -G Ninja -S /server -B /xiadmin/build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /xiadmin/build -j$(nproc) && \
     # --- CACHE ---
-    cp -p /server/xi_* /xiadmin/build/; \
-    cp -p /server/src/common/version.cpp /xiadmin/build/;
+    cp -p /server/xi_* /xiadmin/build/ && \
+    cp -p /server/src/common/version.cpp /xiadmin/build/
     # --- End ---
 
 #################

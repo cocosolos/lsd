@@ -23,6 +23,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     mariadb-connector-c \
     openssl \
     python3 \
+    tzdata \
     zeromq \
     zlib
 
@@ -35,8 +36,7 @@ ENV PATH=/xiadmin/.local/bin:$PATH
 FROM base AS build
 
 # Install build dependencies.
-RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
-    apk --update-cache add \
+RUN apk --update-cache add \
     binutils-dev \
     ccache \
     cmake \
@@ -48,6 +48,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     openssl-dev \
     python3-dev \
     py3-pip \
+    samurai \
     zeromq-dev \
     zlib-dev
 
@@ -56,7 +57,7 @@ WORKDIR /server
 
 # Install Python dependencies here, copied into runtime stage.
 RUN --mount=type=bind,source=server/tools/requirements.txt,target=/tmp/requirements.txt \
-    --mount=type=cache,target=/xiadmin/.cache/pip,uid=$UID,gid=$GID \
+    --mount=type=cache,target=/xiadmin/.cache/pip,id=pip-alpine,uid=$UID,gid=$GID \
     pip3 install --break-system-packages --user --ignore-installed --requirement /tmp/requirements.txt
 
 # Exclude changes to git metadata, scripts, and sql not needed for build.
@@ -80,8 +81,8 @@ RUN LSB_FILE="/server/cmake/FindMariaDBCPP.cmake" && \
 
 # Cache the build. Bind mounts to save copy time and keep clean git hash.
 ENV CCACHE_DIR=/xiadmin/.ccache
-RUN --mount=type=cache,target=/xiadmin/build,uid=$UID,gid=$GID \
-    --mount=type=cache,target=/xiadmin/.ccache,uid=$UID,gid=$GID \
+RUN --mount=type=cache,target=/xiadmin/build,id=build-alpine,uid=$UID,gid=$GID \
+    --mount=type=cache,target=/xiadmin/.ccache,id=ccache-alpine,uid=$UID,gid=$GID \
     --mount=type=bind,source=.git,target=/.git \
     --mount=type=bind,source=server/.git,target=/server/.git \
     --mount=type=bind,source=server/scripts,target=/server/scripts \
@@ -90,9 +91,9 @@ RUN --mount=type=cache,target=/xiadmin/build,uid=$UID,gid=$GID \
     cp -p /xiadmin/build/version.cpp /server/src/common/ 2> /dev/null; \
     cp -p /xiadmin/build/xi_* /server/ 2> /dev/null; \
     # --- End ---
-    cmake -S /server -B /xiadmin/build -DCMAKE_BUILD_TYPE=Release && \
+    cmake -G Ninja -S /server -B /xiadmin/build -DCMAKE_BUILD_TYPE=Release && \
     # --- PATCH efsw ---
-    EFSW_FILE="/xiadmin/build/_deps/efsw-src/src/efsw/FileWatcherInotify.cpp"; \
+    EFSW_FILE="/xiadmin/build/_deps/efsw-src/src/efsw/FileWatcherInotify.cpp" && \
     if [ -f "$EFSW_FILE" ]; then \
         # Check if include is missing.
         if ! grep -qF '#include <sys/select.h>' "$EFSW_FILE"; then \
@@ -110,9 +111,8 @@ RUN --mount=type=cache,target=/xiadmin/build,uid=$UID,gid=$GID \
     # --- End Patch ---
     cmake --build /xiadmin/build -j$(nproc) && \
     # --- CACHE ---
-    # Alpine seems to always re-link the executables.
-    cp -p /server/xi_* /xiadmin/build/; \
-    cp -p /server/src/common/version.cpp /xiadmin/build/;
+    cp -p /server/xi_* /xiadmin/build/ && \
+    cp -p /server/src/common/version.cpp /xiadmin/build/
     # --- End ---
 
 #################

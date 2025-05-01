@@ -27,7 +27,7 @@ fi
 
 # Load environment variables.
 if [ -f "$ENV_FILE" ]; then
-    echo "Loading environment vairables from $ENV_FILE..."
+    echo "Loading environment variables from $ENV_FILE..."
     set -a # Automatically export all sourced variables.
     source "$ENV_FILE"
     set +a
