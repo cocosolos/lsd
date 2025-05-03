@@ -1,32 +1,22 @@
-x-common: &common # Configs used by more than one service.
-  image: lsd_service:ubuntu
-  pull_policy: never
+x-common: &common
+  image: landsandboat-server:latest
+  env_file: ./config/.env
   environment:
     XI_NETWORK_HTTP_HOST: 0.0.0.0
     XI_NETWORK_ZMQ_IP: world
     XI_NETWORK_SQL_HOST: database
+    # Add settings here or in .env: XI_{file}_{setting}
   volumes:
-    - ./.git:/.git
-    - ./config:/config
-    - ./server/.git:/server/.git
-    - ./server/log:/server/log
-    - ./server/losmeshes:/server/losmeshes
-    - ./server/modules:/server/modules
-    - ./server/navmeshes:/server/navmeshes
-    - ./server/scripts:/server/scripts
-    - ./server/settings:/server/settings
-    - ./server/sql:/server/sql
-    - ./server/tools:/server/tools
+    - ./config/config.yaml:/server/tools/config.yaml # Enables dbtool express updates. Create this (empty) file on the host before running.
+    - losmeshes:/server/losmeshes # Initialize before running:
+    - navmeshes:/server/navmeshes # docker run --rm -v losmeshes:/losmeshes -v navmeshes:/navmeshes ximeshes:latest
 
 services:
   database:
     image: mariadb
-    entrypoint: ["/mariadb-entrypoint.sh"]
-    command: ["mariadbd"]
     restart: always
+    env_file: ./config/.env
     volumes:
-      - ./config:/config
-      - ./mariadb-entrypoint.sh:/mariadb-entrypoint.sh # Custom entrypoint to generate .env.
       - database:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -35,13 +25,9 @@ services:
       timeout: 5s
       retries: 3
 
-  dbtool:
-    <<: *common # Import common configs.
-    build:
-      context: .
-      dockerfile: docker/ubuntu.Dockerfile # This service builds the image shared by all LSB services.
+  database-update:
+    <<: *common
     command: ["python3", "/server/tools/dbtool.py", "update"]
-    restart: no
     depends_on:
       database:
         condition: service_healthy
@@ -58,7 +44,7 @@ services:
       database:
         condition: service_healthy
         restart: true
-      dbtool:
+      database-update:
         condition: service_completed_successfully
 
   search:
@@ -71,7 +57,7 @@ services:
       database:
         condition: service_healthy
         restart: true
-      dbtool:
+      database-update:
         condition: service_completed_successfully
 
   world:
@@ -84,7 +70,7 @@ services:
       database:
         condition: service_healthy
         restart: true
-      dbtool:
+      database-update:
         condition: service_completed_successfully
 
   map:
@@ -97,10 +83,14 @@ services:
       database:
         condition: service_healthy
         restart: true
-      dbtool:
+      database-update:
         condition: service_completed_successfully
       world:
         condition: service_started
 
 volumes:
   database:
+  losmeshes:
+    external: true
+  navmeshes:
+    external: true

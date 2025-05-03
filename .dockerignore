@@ -1,9 +1,0 @@
-# Nothing tracked by LSB git should be in here.
-# Keeps git hash clean during build.
-server/build
-server/log/*.log
-server/losmeshes/**
-server/navmeshes/**
-server/settings/*.lua
-server/sql/backups/*.sql
-server/tools/config.yaml

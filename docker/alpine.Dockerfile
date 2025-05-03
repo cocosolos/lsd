@@ -1,19 +1,9 @@
-# syntax=docker/dockerfile:1-labs
-
-##############
-# Base stage #
-##############
+########
+# Base #
+########
 FROM alpine:latest AS base
 
-ARG UNAME=xiadmin
-ARG UGROUP=xiadmin
-ARG UID=1000
-ARG GID=1000
-
-RUN addgroup --gid $GID $UGROUP && \
-    adduser  --uid $UID $UNAME --ingroup $UGROUP --home /xiadmin --disabled-password
-
-# Install runtime dependencies at the base level.
+# Install runtime dependencies.
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     apk --update-cache add \
     binutils \
@@ -30,9 +20,17 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
 RUN git config --system --add safe.directory /server
 ENV PATH=/xiadmin/.local/bin:$PATH
 
-###############
-# Build stage #
-###############
+ARG UNAME=xiadmin
+ARG UGROUP=xiadmin
+ARG UID=1000
+ARG GID=1000
+
+RUN addgroup --gid $GID $UGROUP && \
+    adduser  --uid $UID $UNAME --ingroup $UGROUP --home /xiadmin --disabled-password
+
+#########
+# Build #
+#########
 FROM base AS build
 
 # Install build dependencies.
@@ -55,16 +53,13 @@ RUN apk --update-cache add \
 USER $UNAME
 WORKDIR /server
 
-# Install Python dependencies here, copied into runtime stage.
-RUN --mount=type=bind,source=server/tools/requirements.txt,target=/tmp/requirements.txt \
-    --mount=type=cache,target=/xiadmin/.cache/pip,id=pip-alpine,uid=$UID,gid=$GID \
-    pip3 install --break-system-packages --user --ignore-installed --requirement /tmp/requirements.txt
+ARG ORIGIN='LandSandBoat'
+ARG BRANCH='base'
 
-# Exclude changes to git metadata, scripts, and sql not needed for build.
-# Excluded here instead of dockerignore so they can be bind mounted during build.
-# Saves from copying everything whenever scripts/sql change.
-# https://docs.docker.com/reference/dockerfile/#copy---exclude (docker/dockerfile:1.7-labs)
-COPY --chown=$UNAME:$UGROUP --exclude=.git --exclude=scripts --exclude=sql server /server
+# Download the latest release. We don't actually need the tarball but it helps with caching.
+ADD --chown=$UNAME:$UGROUP https://api.github.com/repos/$ORIGIN/server/tarball/$BRANCH /server
+RUN rm /server/$BRANCH && \
+    git clone --filter=tree:0 --branch=$BRANCH https://github.com/$ORIGIN/server.git /server
 
 # --- PATCH LSB ---
 RUN LSB_FILE="/server/cmake/FindMariaDBCPP.cmake" && \
@@ -79,14 +74,13 @@ RUN LSB_FILE="/server/cmake/FindMariaDBCPP.cmake" && \
     fi;
 # --- End Patch ---
 
-# Cache the build. Bind mounts to save copy time and keep clean git hash.
+# Install Python dependencies.
+RUN --mount=type=cache,target=/xiadmin/.cache/pip,id=$ORIGIN-$BRANCH-pip-alpine,uid=$UID,gid=$GID \
+    pip3 install --break-system-packages --user --ignore-installed --requirement /server/tools/requirements.txt
+
 ENV CCACHE_DIR=/xiadmin/.ccache
-RUN --mount=type=cache,target=/xiadmin/build,id=build-alpine,uid=$UID,gid=$GID \
-    --mount=type=cache,target=/xiadmin/.ccache,id=ccache-alpine,uid=$UID,gid=$GID \
-    --mount=type=bind,source=.git,target=/.git \
-    --mount=type=bind,source=server/.git,target=/server/.git \
-    --mount=type=bind,source=server/scripts,target=/server/scripts \
-    --mount=type=bind,source=server/sql,target=/server/sql \
+RUN --mount=type=cache,target=/xiadmin/build,id=$ORIGIN-$BRANCH-build-alpine,uid=$UID,gid=$GID \
+    --mount=type=cache,target=/xiadmin/.ccache,id=$ORIGIN-$BRANCH-ccache-alpine,uid=$UID,gid=$GID \
     # --- CACHE ---
     cp -p /xiadmin/build/version.cpp /server/src/common/ 2> /dev/null; \
     cp -p /xiadmin/build/xi_* /server/ 2> /dev/null; \
@@ -115,19 +109,24 @@ RUN --mount=type=cache,target=/xiadmin/build,id=build-alpine,uid=$UID,gid=$GID \
     cp -p /server/src/common/version.cpp /xiadmin/build/
     # --- End ---
 
-#################
-# Runtime stage #
-#################
+###########
+# Service #
+###########
 FROM base AS service
 
 USER $UNAME
 WORKDIR /server
 
-COPY server/res/compress.dat server/res/decompress.dat /server/res/
-
-# Copy installed Python dependencies and built executables from build stage.
-COPY --from=build /xiadmin/.local /xiadmin/.local
-COPY --from=build /server/xi_* /server/
+COPY --chown=$UNAME:$UGROUP --from=build /xiadmin/.local /xiadmin/.local
+COPY --chown=$UNAME:$UGROUP --from=build /server/res/compress.dat /server/res/decompress.dat /server/res/
+COPY --chown=$UNAME:$UGROUP --from=build /server/scripts /server/scripts
+COPY --chown=$UNAME:$UGROUP --from=build /server/sql /server/sql
+COPY --chown=$UNAME:$UGROUP --from=build /server/tools /server/tools
+COPY --chown=$UNAME:$UGROUP --from=build /server/modules /server/modules
+COPY --chown=$UNAME:$UGROUP --from=build /server/settings /server/settings
+COPY --chown=$UNAME:$UGROUP --from=build /server/.git /server/.git
+COPY --chown=$UNAME:$UGROUP --from=build /server/xi_* /server/
 
 COPY --chmod=0755 entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/ash"]
