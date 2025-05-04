@@ -11,4 +11,4 @@ export XI_NETWORK_SQL_PASSWORD
 export XI_NETWORK_SQL_LOGIN
 export XI_NETWORK_SQL_DATABASE
 
-exec "$@"
+exec /usr/bin/tini -- "$@"

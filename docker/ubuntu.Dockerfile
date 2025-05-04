@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libzmq5 \
     mariadb-client \
     python3 \
+    tini \
     tzdata \
     zlib1g
 

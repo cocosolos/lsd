@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     mariadb-connector-c \
     openssl \
     python3 \
+    tini \
     tzdata \
     zeromq \
     zlib
